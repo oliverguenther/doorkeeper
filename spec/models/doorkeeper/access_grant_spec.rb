@@ -1,6 +1,7 @@
 require 'spec_helper'
 
 describe Doorkeeper::AccessGrant do
+  let(:clazz) { Doorkeeper::AccessGrant }
   subject { FactoryBot.build(:access_grant) }
 
   it { expect(subject).to be_valid }
@@ -9,6 +10,32 @@ describe Doorkeeper::AccessGrant do
   it_behaves_like 'a revocable token'
   it_behaves_like 'a unique token' do
     let(:factory_name) { :access_grant }
+  end
+
+  context 'with hashing enabled' do
+    let(:grant) { FactoryBot.create :access_grant }
+    include_context 'with token hashing enabled'
+
+    it 'holds a volatile plaintext token when created' do
+      expect(grant.plaintext_token).to be_a(String)
+      expect(grant.token).to eq(hash_function(grant.plaintext_token))
+
+      # Finder method only finds the hashed token
+      loaded = clazz.find_by(token: grant.token)
+      expect(loaded).to eq(grant)
+      expect(loaded.plaintext_token).to be_nil
+      expect(loaded.token).to eq(grant.token)
+    end
+
+    it 'does not find_by plain text tokens' do
+      expect(clazz.find_by(token: grant.plaintext_token)).to be_nil
+    end
+
+    it 'does provide lookups with either through by_token' do
+      expect(clazz.by_token(grant.plaintext_token)).to eq(grant)
+      # This will work only due to lookup of input token
+      expect(clazz.by_token(grant.token)).to eq(grant)
+    end
   end
 
   describe 'validations' do

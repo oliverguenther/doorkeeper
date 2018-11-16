@@ -9,6 +9,7 @@ module Doorkeeper
     include Models::Revocable
     include Models::Accessible
     include Models::Orderable
+    include Models::Hashable
     include Models::Scopes
 
     module ClassMethods
@@ -22,7 +23,7 @@ module Doorkeeper
       #   if there is no record with such token
       #
       def by_token(token)
-        find_by(token: token.to_s)
+        find_by_hashed_or_plain_token(:token, token)
       end
 
       # Returns an instance of the Doorkeeper::AccessToken
@@ -35,7 +36,7 @@ module Doorkeeper
       #   if there is no record with such refresh token
       #
       def by_refresh_token(refresh_token)
-        find_by(refresh_token: refresh_token.to_s)
+        find_by_hashed_or_plain_token(:refresh_token, refresh_token)
       end
 
       # Revokes AccessToken records that have not been revoked and associated
@@ -219,6 +220,26 @@ module Doorkeeper
       accessible? && includes_scope?(*scopes)
     end
 
+    # We keep a volatile copy of the raw refresh token for initial communication
+    # The stored refresh_token may be mapped and not available in cleartext.
+    def plaintext_refresh_token
+      if Doorkeeper.configuration.hash_secrets?
+        @volatile_refresh_token
+      else
+        refresh_token
+      end
+    end
+
+    # We keep a volatile copy of the raw token for initial communication
+    # The stored refresh_token may be mapped and not available in cleartext.
+    def plaintext_token
+      if Doorkeeper.configuration.hash_secrets?
+        @volatile_token
+      else
+        token
+      end
+    end
+
     private
 
     # Generates refresh token with UniqueToken generator.
@@ -226,7 +247,10 @@ module Doorkeeper
     # @return [String] refresh token value
     #
     def generate_refresh_token
-      self.refresh_token = UniqueToken.generate
+      @volatile_refresh_token = UniqueToken.generate
+      self.refresh_token = Doorkeeper.configuration.hashed_or_plain_token(
+        @volatile_refresh_token
+      )
     end
 
     # Generates and sets the token value with the
@@ -242,13 +266,18 @@ module Doorkeeper
     def generate_token
       self.created_at ||= Time.now.utc
 
-      self.token = token_generator.generate(
+      @volatile_token = token_generator.generate(
         resource_owner_id: resource_owner_id,
         scopes: scopes,
         application: application,
         expires_in: expires_in,
         created_at: created_at
       )
+
+      self.token = Doorkeeper.configuration.hashed_or_plain_token(
+        @volatile_token
+      )
+      @volatile_token
     end
 
     def token_generator

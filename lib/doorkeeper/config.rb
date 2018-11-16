@@ -46,6 +46,7 @@ module Doorkeeper
       end
 
       def build
+        @config.validate
         @config
       end
 
@@ -241,6 +242,11 @@ module Doorkeeper
     option :grant_flows,                    default: %w[authorization_code client_credentials]
     option :handle_auth_errors,             default: :render
 
+    # Allow optional hashing of input tokens to some other representation
+    # that is persisted. Can be used for hashing of input token,
+    # grants and application secret values.
+    option :hash_secrets, default: nil
+
     # Allows to forbid specific Application redirect URI's by custom rules.
     # Doesn't forbid any URI by default.
     #
@@ -286,9 +292,14 @@ module Doorkeeper
     option :base_controller,
            default: 'ActionController::Base'
 
-    attr_reader :reuse_access_token
-    attr_reader :api_only
-    attr_reader :enforce_content_type
+    attr_reader :api_only,
+                :enforce_content_type,
+                :reuse_access_token
+
+    # Return the valid subset of this configuration
+    def validate
+      validate_reuse_access_token_value
+    end
 
     def api_only
       @api_only ||= false
@@ -320,6 +331,18 @@ module Doorkeeper
 
     def raise_on_errors?
       handle_auth_errors == :raise
+    end
+
+    def hash_secrets?
+      !@hash_secrets.nil?
+    end
+
+    def hashed_or_plain_token(plain_token)
+      if @hash_secrets
+        @hash_secrets.call(plain_token)
+      else
+        plain_token
+      end
     end
 
     def default_scopes
@@ -369,6 +392,20 @@ module Doorkeeper
       types = grant_flows - ['implicit']
       types << 'refresh_token' if refresh_token_enabled?
       types
+    end
+
+    # Determine whether +reuse_access_token+ and +hash_secrets+
+    # have both been activated.
+    #
+    # In that case, disable reuse_access_token value and warn the user.
+    def validate_reuse_access_token_value
+      return unless hash_secrets? && reuse_access_token
+
+      ::Rails.logger.warn(
+        'You are configured both reuse_access_token AND hash_secrets. ' \
+        'This combination is unsupported. reuse_access_token will be disabled'
+      )
+      @reuse_access_token = false
     end
   end
 end

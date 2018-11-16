@@ -75,7 +75,25 @@ Doorkeeper.configure do
   # doesn't updates existing token expiration time, it will create a new token instead.
   # Rationale: https://github.com/doorkeeper-gem/doorkeeper/issues/383
   #
+  # You can not enable this option together with +hash_secrets+.
+  #
   # reuse_access_token
+
+  # Hash access and refresh tokens, access grants and application secrets
+  # before persisting them.
+  # This will prohibit displaying any plain values after initial creation
+  # (this affects displaying application secrets which are no longer stored)
+  # Also, this disables the possibility to use +reuse_access_token+
+  # since plain values can no longer be retrieved.
+  #
+  # Since old values will not be re-hashed, lookups to tokens and secrets
+  # will fall back to plain value comparison so any existing tokens will
+  # not be invalidated.
+  #
+  # For example, to use SHA256 digests on plain values, uncomment these lines:
+  # hash_secrets do |plain_value|
+  #   Digest::SHA256.hexdigest plain_value
+  # end
 
   # Issue access tokens with refresh token (disabled by default), you may also
   # pass a block which accepts `context` to customize when to give a refresh

@@ -9,6 +9,7 @@ User-visible changes worth mentioning.
 
 - [#1162] Fix `enforce_content_type` for requests without body.
 - [#1164] Fix error when `root_path` is not defined.
+- [#1168]: Allow optional hashing of tokens and secrets.
 
 ## 5.0.2
 

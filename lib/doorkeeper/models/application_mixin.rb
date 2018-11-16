@@ -25,7 +25,7 @@ module Doorkeeper
         app = by_uid(uid)
         return unless app
         return app if secret.blank? && !app.confidential?
-        return unless app.secret == secret
+        return unless app.secret_matches?(secret)
         app
       end
 
@@ -48,6 +48,15 @@ module Doorkeeper
     # @return [String] The redirect URI(s) seperated by newlines.
     def redirect_uri=(uris)
       super(uris.is_a?(Array) ? uris.join("\n") : uris)
+    end
+
+    ##
+    # Securely compare the given input secret with
+    # this application's (optionally hashed) secret.
+    # To fall back to older plaintext applications, also compares plain values.
+    def secret_matches?(input)
+      secret == Doorkeeper.configuration.hashed_or_plain_token(input) ||
+        secret == input
     end
   end
 end

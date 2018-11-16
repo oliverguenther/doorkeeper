@@ -21,6 +21,19 @@ module Doorkeeper
 
     before_validation :generate_token, on: :create
 
+    # Keep a reference to the generated token during generation
+    # of this access grant. The actual token may be mapped by
+    # the configuration hasher and may not be available in plaintext.
+    #
+    # If hash tokens are enabled, this will return nil on fetched tokens
+    def plaintext_token
+      if Doorkeeper.configuration.hash_secrets?
+        @volatile_token
+      else
+        token
+      end
+    end
+
     private
 
     # Generates token value with UniqueToken class.
@@ -28,7 +41,10 @@ module Doorkeeper
     # @return [String] token value
     #
     def generate_token
-      self.token = UniqueToken.generate
+      @volatile_token = UniqueToken.generate
+      self.token = Doorkeeper.configuration.hashed_or_plain_token(
+        @volatile_token
+      )
     end
   end
 end

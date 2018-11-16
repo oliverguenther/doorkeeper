@@ -2,6 +2,7 @@ require 'spec_helper'
 
 module Doorkeeper
   describe AccessToken do
+    let(:clazz) { Doorkeeper::AccessToken }
     subject { FactoryBot.build(:access_token) }
 
     it { expect(subject).to be_valid }
@@ -22,6 +23,32 @@ module Doorkeeper
 
         token = FactoryBot.create :access_token
         expect(token.token).to be_a(String)
+      end
+
+      context 'with hashing enabled' do
+        let(:token) { FactoryBot.create :access_token }
+        include_context 'with token hashing enabled'
+
+        it 'holds a volatile plaintext token when created' do
+          expect(token.plaintext_token).to be_a(String)
+          expect(token.token).to eq(hash_function(token.plaintext_token))
+
+          # Finder method only finds the hashed token
+          loaded = clazz.find_by(token: token.token)
+          expect(loaded).to eq(token)
+          expect(loaded.plaintext_token).to be_nil
+          expect(loaded.token).to eq(token.token)
+        end
+
+        it 'does not find_by plain text tokens' do
+          expect(clazz.find_by(token: token.plaintext_token)).to be_nil
+        end
+
+        it 'does provide lookups with either through by_token' do
+          expect(clazz.by_token(token.plaintext_token)).to eq(token)
+          # This will work only due to lookup of input token
+          expect(clazz.by_token(token.token)).to eq(token)
+        end
       end
 
       it 'generates a token using a custom object' do
@@ -195,6 +222,32 @@ module Doorkeeper
           token2.refresh_token = token1.refresh_token
           token2.save(validate: false)
         end.to raise_error(uniqueness_error)
+      end
+
+      context 'with hashing enabled' do
+        include_context 'with token hashing enabled'
+        let(:token) { FactoryBot.create :access_token, use_refresh_token: true }
+
+        it 'holds a volatile refresh token when created' do
+          expect(token.plaintext_refresh_token).to be_a(String)
+          expect(token.refresh_token).to eq(hash_function(token.plaintext_refresh_token))
+
+          # Finder method only finds the hashed token
+          loaded = clazz.find_by(refresh_token: token.refresh_token)
+          expect(loaded).to eq(token)
+          expect(loaded.plaintext_refresh_token).to be_nil
+          expect(loaded.refresh_token).to eq(token.refresh_token)
+        end
+
+        it 'does not find_by plain text refresh tokens' do
+          expect(clazz.find_by(refresh_token: token.plaintext_refresh_token)).to be_nil
+        end
+
+        it 'does provide lookups with either through by_token' do
+          expect(clazz.by_refresh_token(token.plaintext_refresh_token)).to eq(token)
+          # This will work only due to lookup of input token
+          expect(clazz.by_refresh_token(token.refresh_token)).to eq(token)
+        end
       end
     end
 
