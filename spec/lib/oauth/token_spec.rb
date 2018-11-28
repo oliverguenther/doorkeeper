@@ -116,7 +116,7 @@ module Doorkeeper
         context 'token hashing is enabled' do
           include_context 'with token hashing enabled'
 
-          let(:hashed_token) { hash_function('token') }
+          let(:hashed_token) { hashed_or_plain_token_func.call('token') }
           let(:token) { ->(_r) { 'token' } }
 
           it 'searches with the hashed token' do

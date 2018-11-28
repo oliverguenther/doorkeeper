@@ -18,7 +18,8 @@ describe Doorkeeper::AccessGrant do
 
     it 'holds a volatile plaintext token when created' do
       expect(grant.plaintext_token).to be_a(String)
-      expect(grant.token).to eq(hash_function(grant.plaintext_token))
+      expect(grant.token)
+        .to eq(hashed_or_plain_token_func.call(grant.plaintext_token))
 
       # Finder method only finds the hashed token
       loaded = clazz.find_by(token: grant.token)
@@ -31,10 +32,43 @@ describe Doorkeeper::AccessGrant do
       expect(clazz.find_by(token: grant.plaintext_token)).to be_nil
     end
 
-    it 'does provide lookups with either through by_token' do
-      expect(clazz.by_token(grant.plaintext_token)).to eq(grant)
-      # This will work only due to lookup of input token
-      expect(clazz.by_token(grant.token)).to eq(grant)
+    describe 'with having a plain text token' do
+      let(:plain_text_token) { 'plain text token' }
+
+      before do
+        # Assume we have a plain text token from before activating the option
+        grant.update_column(:token, plain_text_token)
+      end
+
+      context 'without fallback lookup' do
+        it 'does not provide lookups with either through by_token' do
+          expect(clazz.by_token(plain_text_token)).to eq(nil)
+          expect(clazz.by_token(grant.token)).to eq(nil)
+
+          # And it does not touch the token
+          grant.reload
+          expect(grant.token).to eq(plain_text_token)
+        end
+      end
+
+      context 'with fallback lookup' do
+        include_context 'with token hashing and fallback lookup enabled'
+
+        it 'upgrades a plain token when falling back to it' do
+          # Side-effect: This will automatically upgrade the token
+          expect(clazz).to receive(:upgrade_fallback_value).and_call_original
+          expect(clazz.by_token(plain_text_token)).to eq(grant)
+
+          # Will find subsequently by hashing the token
+          expect(clazz.by_token(plain_text_token)).to eq(grant)
+
+          # And it modifies the token value
+          grant.reload
+          expect(grant.token).not_to eq(plain_text_token)
+          expect(clazz.find_by(token: plain_text_token)).to eq(nil)
+          expect(clazz.find_by(token: grant.token)).not_to be_nil
+        end
+      end
     end
   end
 

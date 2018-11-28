@@ -526,13 +526,68 @@ describe Doorkeeper, 'configuration' do
     end
   end
 
-  describe 'hash_secrets together with reuse_access_token' do
+  describe 'hash_application_secrets' do
+    it 'is disabled by default' do
+      expect(subject.hash_application_secrets?).to eq(false)
+      expect(::Doorkeeper::Application.perform_secret_hashing?).to eq(false)
+    end
+
+    context 'when provided' do
+      before do
+        Doorkeeper.configure do
+          reuse_access_token
+          hash_application_secrets
+        end
+      end
+
+      it 'will enable hashing for applications' do
+        expect(subject.reuse_access_token).to eq(true)
+        expect(subject.hash_application_secrets?).to eq(true)
+
+        expect(::Doorkeeper::Application.perform_secret_hashing?).to eq(true)
+      end
+    end
+  end
+
+  describe 'hash_token_secrets' do
+    it 'is disabled by default' do
+      expect(subject.hash_token_secrets?).to eq(false)
+      expect(::Doorkeeper::AccessToken.perform_secret_hashing?).to eq(false)
+      expect(::Doorkeeper::AccessGrant.perform_secret_hashing?).to eq(false)
+    end
+
+    context 'when provided' do
+      include_context 'with token hashing enabled'
+
+      it 'will enable hashing for AccessToken and AccessGrant' do
+        expect(subject.hash_token_secrets?).to eq(true)
+        expect(::Doorkeeper::AccessToken.perform_secret_hashing?).to eq(true)
+        expect(::Doorkeeper::AccessGrant.perform_secret_hashing?).to eq(true)
+      end
+    end
+  end
+
+  describe 'fallback_to_plain_secrets' do
+    it 'is disabled by default' do
+      expect(subject.fallback_to_plain_secrets?).to eq(false)
+    end
+
+    context 'when provided' do
+      include_context 'with token hashing and fallback lookup enabled'
+
+      it 'will enable fallbacks' do
+        expect(subject.fallback_to_plain_secrets?).to eq(true)
+      end
+    end
+  end
+
+  describe 'hash_token_secrets together with reuse_access_token' do
     it 'will disable reuse_access_token' do
       expect(Rails.logger).to receive(:warn).with(/reuse_access_token will be disabled/)
 
       Doorkeeper.configure do
         reuse_access_token
-        hash_secrets { 'does not matter' }
+        hash_token_secrets
       end
 
       expect(subject.reuse_access_token).to eq(false)

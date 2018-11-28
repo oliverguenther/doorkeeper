@@ -48,8 +48,8 @@ module Doorkeeper
     # We keep a volatile copy of the raw client_secret for initial communication
     # The stored secret may be mapped and not available in cleartext.
     def plaintext_secret
-      if Doorkeeper.configuration.hash_secrets?
-        @volatile_secret
+      if perform_secret_hashing?
+        @raw_secret
       else
         secret
       end
@@ -64,10 +64,8 @@ module Doorkeeper
     def generate_secret
       return unless secret.blank?
 
-      @volatile_secret = UniqueToken.generate
-      self.secret = Doorkeeper.configuration.hashed_or_plain_token(
-        @volatile_secret
-      )
+      @raw_secret = UniqueToken.generate
+      self.secret = hashed_or_plain_token(@raw_secret)
     end
 
     def scopes_match_configured

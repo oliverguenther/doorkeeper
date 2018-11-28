@@ -31,7 +31,13 @@ module Doorkeeper
       #   if there is no record with such token
       #
       def by_token(token)
-        find_by_hashed_or_plain_token(:token, token)
+        find_by_plaintext_token(:token, token)
+      end
+
+      # We want to perform secret hashing whenever the user
+      # enables the configuration option +hash_token_secrets+
+      def perform_secret_hashing?
+        Doorkeeper.configuration.hash_token_secrets?
       end
 
       # Revokes AccessGrant records that have not been revoked and associated

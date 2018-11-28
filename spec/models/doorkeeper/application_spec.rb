@@ -124,20 +124,33 @@ module Doorkeeper
     end
 
     context 'with hashing enabled' do
-      include_context 'with token hashing enabled'
+      include_context 'with application hashing enabled'
       let(:app) { FactoryBot.create :application }
 
-      it 'holds a volatile plaintext secret' do
+      it 'holds a volatile plaintext and BCrypt secret' do
         expect(app.plaintext_secret).to be_a(String)
-        expect(app.secret).to eq(hash_function(app.plaintext_secret))
+        expect(app.secret).not_to eq(app.plaintext_secret)
+        expect { BCrypt::Password.create(app.secret) }.not_to raise_error
       end
 
-      it 'provides plain and hashed lookup' do
+      it 'does not fallback to plain lookup by default' do
         lookup = clazz.by_uid_and_secret(app.uid, app.secret)
-        expect(lookup).to eq(app)
+        expect(lookup).to eq(nil)
 
         lookup = clazz.by_uid_and_secret(app.uid, app.plaintext_secret)
         expect(lookup).to eq(app)
+      end
+
+      context 'with fallback enabled' do
+        include_context 'with token hashing and fallback lookup enabled'
+
+        it 'provides plain and hashed lookup' do
+          lookup = clazz.by_uid_and_secret(app.uid, app.secret)
+          expect(lookup).to eq(app)
+
+          lookup = clazz.by_uid_and_secret(app.uid, app.plaintext_secret)
+          expect(lookup).to eq(app)
+        end
       end
 
       it 'does not provide access to secret after loading' do
